@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import shutil
+
 from lektor.build_programs import AttachmentBuildProgram, buildprogram
 from lektor.context import get_ctx
 from lektor.db import Image
@@ -37,14 +39,21 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
             ext_pos = df.rfind(".")
             dst_filename = "%s-%s.%s" % (df[:ext_pos], item, df[ext_pos + 1:])
 
-            def closure(dst_filename, source_img, width, height):
+            def closure(dst_filename, source_img, width, height, resize_image=True):
                 # We need this closure, otherwise variables get updated and this
                 # doesn't work at all.
                 @ctx.sub_artifact(artifact_name=dst_filename, sources=[source_img])
                 def build_thumbnail_artifact(artifact):
                     artifact.ensure_dir()
-                    process_image(ctx, source_img, artifact.dst_filename, width, height)
-            closure(dst_filename, source_img, width, height)
+                    if not resize_image:
+                        shutil.copy2(source_img, artifact.dst_filename)
+                    else:
+                        process_image(ctx, source_img, artifact.dst_filename, width, height)
+
+            # If the image is larger than the max_width, resize it, otherwise
+            # just copy it.
+            resize_image = w > width
+            closure(dst_filename, source_img, width, height, resize_image)
 
 
 class ThumbnailGeneratorPlugin(Plugin):

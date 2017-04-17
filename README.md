@@ -56,7 +56,8 @@ max_width = 2000
 Will take a file called `cat.jpg` and create the files `cat-small.jpg`,
 `cat-medium.jpg` and `cat-woowee.jpg`. All the files will be created, regardless
 of whether the original file is smaller, so you can link without worrying
-whether a file will exist or not.
+whether a file will exist or not. If the original file is smaller than the width
+you have specified, the file will only be copied, and will not be resized.
 
 Unfortunately, due to the way Lektor's thumbnail system works, files *will* be
 scaled up if they're too small. The `max_width`/`max_height` parameters work
