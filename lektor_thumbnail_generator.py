@@ -52,7 +52,7 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
 
             # If the image is larger than the max_width, resize it, otherwise
             # just copy it.
-            resize_image = w > width
+            resize_image = w > width or h > height
             closure(dst_filename, source_img, width, height, resize_image)
 
 
