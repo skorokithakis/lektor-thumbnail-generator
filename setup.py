@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='lektor-thumbnail-generator',
-    version='0.3.1',
+    version='0.3.2',
     author=u'Stavros Korokithakis,,,',
     author_email='hi@stavros.io',
     url='https://github.com/skorokithakis/lektor-thumbnail-generator/',
