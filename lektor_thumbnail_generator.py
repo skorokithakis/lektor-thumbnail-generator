@@ -4,7 +4,7 @@ import shutil
 from lektor.build_programs import AttachmentBuildProgram, buildprogram
 from lektor.context import get_ctx
 from lektor.db import Image
-from lektor.imagetools import computed_height, get_image_info, process_image
+from lektor.imagetools import compute_dimensions, get_image_info, process_image
 from lektor.pluginsystem import Plugin
 from werkzeug.utils import cached_property
 
@@ -33,7 +33,7 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
             height = int(conf.get("max_height", "0"))
 
             if not height:
-                height = computed_height(source_img, width, w, h)
+                _, height = compute_dimensions(source_img, width, w, h)
 
             df = artifact.source_obj.url_path
             ext_pos = df.rfind(".")
