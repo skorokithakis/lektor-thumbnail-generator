@@ -103,9 +103,7 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
                             extra_params=[
                                 "-strip",
                                 "-interlace",
-                                "Plane",
-                                "-gaussian-blur",
-                                "0.05",
+                                "Plane"
                             ],
                         )
 
