@@ -103,7 +103,7 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
                             extra_params=[
                                 "-strip",
                                 "-interlace",
-                                "Plane"
+                                "Plane",
                             ],
                         )
 
