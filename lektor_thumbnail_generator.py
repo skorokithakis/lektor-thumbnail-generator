@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import shutil
 
 from lektor.build_programs import AttachmentBuildProgram, buildprogram
@@ -8,9 +9,41 @@ from lektor.imagetools import (compute_dimensions, find_imagemagick,
                                get_image_info, get_quality)
 from lektor.pluginsystem import Plugin
 from lektor.reporter import reporter
-from lektor.utils import portable_popen
+from lektor.utils import portable_popen, locate_executable
 from werkzeug.utils import cached_property
 
+def process_svg_image(
+    ctx,
+    source_image,
+    dst_filename,
+    width=None,
+    height=None,
+    mode=None,
+):
+    if width is None and height is None:
+        raise ValueError("Must specify at least one of width or height.")
+
+    # Because Lektor doesn't have a generic find program (only imagemagick),
+    # only *nix is supported for simplicity. Imagemagick will be used as the
+    # fallback on Windows, but it won't work well...
+    if os.name == 'nt':
+        return process_image(ctx, source_image, dst_filename, width, height,
+                mode, 85)
+
+    inkscape = locate_executable('inkscape')
+
+    cmdline = [inkscape, source_image]
+
+    if width is not None:
+        cmdline += ["-w", str(width)]
+    if height is not None:
+        cmdline += ["-h", str(height)]
+
+    # FIXME: This will only work with inkscape 1.0+
+    cmdline += ["--export-filename", dst_filename]
+
+    reporter.report_debug_info("inkscape cmd line", cmdline)
+    portable_popen(cmdline).wait()
 
 # We override process_image here because Lektor does not support adding extra
 # parameters yet, but it will soon, and this can be removed when it does.
@@ -82,7 +115,10 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
 
             df = artifact.source_obj.url_path
             ext_pos = df.rfind(".")
-            dst_filename = "%s-%s.%s" % (df[:ext_pos], item, df[ext_pos + 1 :])
+            if df[ext_pos + 1 :] == 'svg':
+                dst_filename = "%s-%s.png" % (df[:ext_pos], item)
+            else:
+                dst_filename = "%s-%s.%s" % (df[:ext_pos], item, df[ext_pos + 1 :])
 
             def closure(dst_filename, source_img, width, height, resize_image=True):
                 # We need this closure, otherwise variables get updated and this
@@ -92,6 +128,14 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
                     artifact.ensure_dir()
                     if not resize_image:
                         shutil.copy2(source_img, artifact.dst_filename)
+                    elif df[ext_pos + 1 :] == 'svg':
+                        process_svg_image(
+                            ctx,
+                            source_img,
+                            artifact.dst_filename,
+                            width,
+                            height,
+                        )
                     else:
                         process_image(
                             ctx,
