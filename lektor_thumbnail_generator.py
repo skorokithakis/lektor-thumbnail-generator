@@ -2,11 +2,13 @@
 import os
 import shutil
 
+from PIL import Image as PILImage
+from PIL import ImageOps
+
 from lektor.build_programs import AttachmentBuildProgram, buildprogram
 from lektor.context import get_ctx
 from lektor.db import Image
-from lektor.imagetools import (compute_dimensions, find_imagemagick,
-                               get_image_info, get_quality)
+from lektor.imagetools import (compute_dimensions, get_image_info, get_quality)
 from lektor.pluginsystem import Plugin
 from lektor.reporter import reporter
 from lektor.utils import portable_popen, locate_executable
@@ -27,7 +29,7 @@ def process_svg_image(
     # only *nix is supported for simplicity. Imagemagick will be used as the
     # fallback on Windows, but it won't work well...
     if os.name == 'nt':
-        return process_image(ctx, source_image, dst_filename, width, height,
+        return process_image(source_image, dst_filename, width, height,
                 mode, 85)
 
     inkscape = locate_executable('inkscape')
@@ -48,14 +50,12 @@ def process_svg_image(
 # We override process_image here because Lektor does not support adding extra
 # parameters yet, but it will soon, and this can be removed when it does.
 def process_image(
-    ctx,
     source_image,
     dst_filename,
     width=None,
     height=None,
     mode=None,
     quality=None,
-    extra_params=None,
 ):
     """Build image from source image, optionally compressing and resizing.
     "source_image" is the absolute path of the source in the content directory,
@@ -64,27 +64,19 @@ def process_image(
     if width is None and height is None:
         raise ValueError("Must specify at least one of width or height.")
 
-    im = find_imagemagick(ctx.build_state.config["IMAGEMAGICK_EXECUTABLE"])
-
     if quality is None:
         quality = get_quality(source_image)
 
-    resize_key = ""
-    if width is not None:
-        resize_key += str(width)
-    if height is not None:
-        resize_key += "x" + str(height)
-
-    cmdline = [im, source_image, "-auto-orient"]
-    cmdline += ["-resize", resize_key]
-
-    if extra_params:
-        cmdline.extend(extra_params)
-
-    cmdline += ["-quality", str(quality), dst_filename]
-
-    reporter.report_debug_info("imagemagick cmd line", cmdline)
-    portable_popen(cmdline).wait()
+    image = PILImage.open(source_image)
+    # Honour EXIF orientation flags so the output is correctly rotated without
+    # needing to store the EXIF data (equivalent to ImageMagick's -auto-orient
+    # followed by -strip).
+    image = ImageOps.exif_transpose(image)
+    image.thumbnail((width, height), PILImage.Resampling.LANCZOS)
+    # JPEG only supports RGB; modes like CMYK or P will raise an error on save.
+    if os.path.splitext(dst_filename)[1].lower() in (".jpg", ".jpeg") and image.mode != "RGB":
+        image = image.convert("RGB")
+    image.save(dst_filename, optimize=True, progressive=True, quality=quality)
 
 
 @buildprogram(Image)
@@ -138,17 +130,11 @@ class ResizedImageBuildProgram(AttachmentBuildProgram):
                         )
                     else:
                         process_image(
-                            ctx,
                             source_img,
                             artifact.dst_filename,
                             width,
                             height,
                             quality=85,
-                            extra_params=[
-                                "-strip",
-                                "-interlace",
-                                "Plane",
-                            ],
                         )
 
             # If the image is larger than the max_width, resize it, otherwise
